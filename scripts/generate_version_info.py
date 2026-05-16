@@ -1,10 +1,10 @@
 import sys
 from PyInstaller.utils.win32.versioninfo import (
     VSVersionInfo, FixedFileInfo, StringFileInfo,
-    StringTable, StringProperty, VarFileInfo, VarStruct
+    StringTable, StringStruct, VarFileInfo, VarStruct
 )
 
-version = sys.argv[1]  # 例: "1.0.2"
+version = sys.argv[1]
 parts   = version.split(".")
 v1, v2, v3 = int(parts[0]), int(parts[1]), int(parts[2])
 
@@ -16,14 +16,14 @@ version_info = VSVersionInfo(
     kids=[
         StringFileInfo([
             StringTable("040904b0", [
-                StringProperty("CompanyName",      "always-begin"),
-                StringProperty("FileDescription",  "Screen Capture and Practical Utility Tool"),
-                StringProperty("FileVersion",      version),
-                StringProperty("InternalName",     "CapTool"),
-                StringProperty("LegalCopyright",   "Copyright (c) 2026 Tatan"),
-                StringProperty("OriginalFilename", "CapTool.exe"),
-                StringProperty("ProductName",      "CapTool"),
-                StringProperty("ProductVersion",   version),
+                StringStruct("CompanyName",      "always-begin"),
+                StringStruct("FileDescription",  "Screen Capture and Practical Utility Tool"),
+                StringStruct("FileVersion",      version),
+                StringStruct("InternalName",     "CapTool"),
+                StringStruct("LegalCopyright",   "Copyright (c) 2026 Tatan"),
+                StringStruct("OriginalFilename", "CapTool.exe"),
+                StringStruct("ProductName",      "CapTool"),
+                StringStruct("ProductVersion",   version),
             ])
         ]),
         VarFileInfo([VarStruct("Translation", [0x0409, 1200])])
