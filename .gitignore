@@ -1,0 +1,44 @@
+# === Python キャッシュ・ビルドファイル ===
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.python-version
+
+# === 環境構築・仮想環境 (Virtual Environments) ===
+# 外部ライブラリ（mss, screeninfo, Pillow等）をインストールしたローカル環境を割愛
+.venv/
+venv/
+ENV/
+env/
+
+# === OS一時ファイル・システム生成ファイル ===
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# === 開発ツール・エディタ設定 (VS Code / PyCharm) ===
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# === アプリケーション固有のデータ（今回のCapTool用） ===
+# 連続キャプチャモードで自動生成される画像ファイルやフォルダを誤ってコミットしないように保護
+*.png
+*.jpg
+*.jpeg
+captures/
+output/
+
+# 開発中にローカルでテスト保存した設定ファイルを割愛（共有用デフォルトを除外するため）
+settings.json
