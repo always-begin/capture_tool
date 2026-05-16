@@ -1,12 +1,14 @@
+import os
 import sys
+import subprocess
 import tkinter as tk
 from tkinter import filedialog
 import customtkinter as ctk
 from PIL import Image, ImageTk
 
-# 作成した外部モジュールをインポート
-from src.ui.overlay import CaptureOverlay  # オーバーレイ画面のパスに合わせて調整してください
+from src.ui.overlay import CaptureOverlay
 from src.core.utils import copy_image_to_clipboard
+
 
 class CapToolStudio(ctk.CTk):
     def __init__(self):
@@ -17,22 +19,23 @@ class CapToolStudio(ctk.CTk):
         self.minsize(700, 450)
         self.protocol("WM_DELETE_WINDOW", self.quit)
 
-        self.current_img = None
-        self.zoom_level  = 1.0
+        self.current_img  = None  # 通常モードで最後にキャプチャした画像
+        self.zoom_level   = 1.0
+        self._save_dir    = None  # 連続モードの保存先
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
         # --- 左: プレビューエリア ---
-        self.preview_frame = ctk.CTkFrame(self, fg_color="#000000", corner_radius=10)
+        self.preview_frame = ctk.CTkFrame(self, fg_color="transparent", corner_radius=10)
         self.preview_frame.grid(row=0, column=0, padx=(20, 10), pady=20, sticky="nsew")
 
+        # 通常モード: Canvas
         self.canvas = tk.Canvas(self.preview_frame, bg="#000000", highlightthickness=0)
         self.canvas.pack(fill="both", expand=True)
 
-        # ズーム・パン用の状態
-        self._pan_start  = None   # ドラッグ開始座標 (x, y)
-        self._offset     = [0, 0] # 画像の中心からのオフセット (px)
+        self._pan_start = None
+        self._offset    = [0, 0]
 
         self.canvas.bind("<MouseWheel>",      self._on_zoom)
         self.canvas.bind("<ButtonPress-1>",   self._on_pan_start)
@@ -40,6 +43,16 @@ class CapToolStudio(ctk.CTk):
         self.canvas.bind("<ButtonRelease-1>", self._on_pan_end)
         self.canvas.bind("<Button-3>",        self._on_reset_view)
         self.canvas.bind("<Configure>",       lambda e: self._render_preview())
+
+        # 連続モード: エクスプローラーで開くボタン（初期は非表示）
+        self.open_dir_btn = ctk.CTkButton(
+            self.preview_frame,
+            text="📁  保存先をエクスプローラーで開く",
+            font=("Yu Gothic UI", 20, "bold"),  # フォント大きく
+            fg_color="#3a3a3a", hover_color="#4a4a4a",
+            corner_radius=10,
+            command=self._open_save_dir
+        )
 
         # --- 右: コントロールパネル ---
         self.side_panel = ctk.CTkFrame(self, width=280, corner_radius=15)
@@ -105,51 +118,79 @@ class CapToolStudio(ctk.CTk):
         has_img   = self.current_img is not None
         is_win    = sys.platform.startswith("win")
 
-        if is_normal and has_img:
-            copy_state = "normal" if is_win else "disabled"
-            copy_fg    = "gray30" if is_win else "gray20"
-            copy_tc    = "white"  if is_win else "gray40"
-            self.copy_btn.configure(state=copy_state, fg_color=copy_fg, text_color=copy_tc)
-            self.save_btn.configure(state="normal", fg_color="gray30", text_color="white")
+        if is_normal:
+            # 連続モードのボタンを隠してCanvasを表示
+            self.open_dir_btn.pack_forget()
+            self.preview_frame.configure(fg_color="#000000")
+            self.canvas.pack(fill="both", expand=True)
+
+            if has_img:
+                copy_state = "normal" if is_win else "disabled"
+                copy_fg    = "gray30" if is_win else "gray20"
+                copy_tc    = "white"  if is_win else "gray40"
+                self.copy_btn.configure(state=copy_state, fg_color=copy_fg, text_color=copy_tc)
+                self.save_btn.configure(state="normal", fg_color="gray30", text_color="white")
+            else:
+                self.copy_btn.configure(state="disabled", fg_color="gray20", text_color="gray40")
+                self.save_btn.configure(state="disabled", fg_color="gray20", text_color="gray40")
+
+            self.copy_btn.pack(pady=5, padx=20, fill="x")
+            self.save_btn.pack(pady=5, padx=20, fill="x")
+
         else:
-            self.copy_btn.configure(state="disabled", fg_color="gray20", text_color="gray40")
-            self.save_btn.configure(state="disabled", fg_color="gray20", text_color="gray40")
+            # Canvasを隠してエクスプローラーボタンを表示
+            self.canvas.pack_forget()
+            self.preview_frame.configure(fg_color="transparent")
+            self.open_dir_btn.pack(fill="both", expand=True)
+
+            # コピー・保存ボタンを隠す
+            self.copy_btn.pack_forget()
+            self.save_btn.pack_forget()
+
+        self._render_preview()
 
     # ------------------------------------------------------------------ capture
 
     def _start_capture(self):
-        mode     = "normal" if self.mode_var.get() == "通常モード" else "continuous"
-        save_dir = None
+        is_normal = self.mode_var.get() == "通常モード"
+        mode      = "normal" if is_normal else "continuous"
+        save_dir  = None
 
         if mode == "continuous":
             save_dir = filedialog.askdirectory(title="保存先フォルダを選択")
             if not save_dir:
                 return
+            self._save_dir = save_dir
 
-        self._disable_canvas_events()  # ← 追加
+        self._disable_canvas_events()
         self.withdraw()
         CaptureOverlay(
             self,
             mode,
             save_dir,
             on_complete=self._on_capture_complete,
-            on_cancel=self._enable_canvas_events
+            on_cancel=self._on_cancel
         )
 
     def _on_capture_complete(self, img):
-        self._enable_canvas_events()   # ← 復元
-        self._set_preview_image(img)
+        self._enable_canvas_events()
+        # 通常モードのみプレビューを更新
+        if self.mode_var.get() == "通常モード":
+            self.current_img = img
+            self.zoom_level  = 1.0
+            self._offset     = [0, 0]
+            self._render_preview()
+            self._update_ui()
+
+    def _on_cancel(self):
+        self._enable_canvas_events()
 
     # ------------------------------------------------------------------ preview
 
-    def _set_preview_image(self, img):
-        self.current_img = img
-        self.zoom_level  = 1.0
-        self._offset     = [0, 0]
-        self._render_preview()
-        self._update_ui()
-
     def _render_preview(self):
+        if self.mode_var.get() != "通常モード":
+            return
+
         cw = self.canvas.winfo_width()
         ch = self.canvas.winfo_height()
         if cw < 10:
@@ -180,26 +221,22 @@ class CapToolStudio(ctk.CTk):
     def _on_zoom(self, event):
         if not self.current_img:
             return
-
         cw = self.canvas.winfo_width()
         ch = self.canvas.winfo_height()
-
-        factor = 1.1 if event.delta > 0 else 0.9
+        factor   = 1.1 if event.delta > 0 else 0.9
         old_zoom = self.zoom_level
         self.zoom_level = max(0.1, min(self.zoom_level * factor, 10.0))
-        scale = self.zoom_level / old_zoom
-
+        scale    = self.zoom_level / old_zoom
         mouse_dx = event.x - (cw // 2 + self._offset[0])
         mouse_dy = event.y - (ch // 2 + self._offset[1])
         self._offset[0] -= int(mouse_dx * (scale - 1))
         self._offset[1] -= int(mouse_dy * (scale - 1))
-
         self._render_preview()
 
     def _on_pan_start(self, event):
         if not self.current_img:
             return
-        self._pan_start = (event.x, event.y)
+        self._pan_start       = (event.x, event.y)
         self._offset_at_start = list(self._offset)
 
     def _on_pan_move(self, event):
@@ -223,9 +260,19 @@ class CapToolStudio(ctk.CTk):
 
     # ------------------------------------------------------------------ actions
 
+    def _open_save_dir(self):
+        if not self._save_dir or not os.path.isdir(self._save_dir):
+            return
+        if sys.platform.startswith("win"):
+            os.startfile(self._save_dir)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", self._save_dir])
+        else:
+            subprocess.Popen(["xdg-open", self._save_dir])
+
     def _copy_to_clip(self):
-        # 外部ファイルに切り出した関数を呼び出すだけ！
-        copy_image_to_clipboard(self.current_img)
+        if self.current_img:
+            copy_image_to_clipboard(self.current_img)
 
     def _save_image(self):
         if not self.current_img:
