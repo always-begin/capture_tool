@@ -31,18 +31,12 @@ jobs:
 
       # 4. タグ名からバージョンを抽出し、メタデータに注入してビルドする
       - name: Build with PyInstaller and Version Info
-        shell: bash
+        shell: pwsh
         run: |
-          # タグ名（refs/tags/v1.0.2 など）から「1.0.2」の数字だけを抽出
-          VERSION=$(echo "${{ github.ref }}" | sed -e 's/refs\/tags\/v//')
-          # カンマ区切りのバージョン形式（1,0,2,0）を作成
-          VERSION_COMMA=$(echo "$VERSION" | sed -e 's/\./,/g'),0
-
-          # 雛形ファイルのバージョン情報を、今回のタグのバージョンに自動書き換え
-          sed -i "s/1, 0, 0, 0/$VERSION_COMMA/g" file_version_info.txt
-          sed -i "s/1.0.0/$VERSION/g" file_version_info.txt
-
-          # アプリ名を「CapTool」に指定してビルドを実行
+          $VERSION = "${{ github.ref }}" -replace 'refs/tags/v', ''
+          $VERSION_COMMA = ($VERSION -replace '\.', ',') + ',0'
+          (Get-Content file_version_info.txt) -replace '1, 0, 0, 0', $VERSION_COMMA | Set-Content file_version_info.txt
+          (Get-Content file_version_info.txt) -replace '1\.0\.0', $VERSION | Set-Content file_version_info.txt
           python -m pyinstaller --onefile --noconsole --name "CapTool" --version-file=file_version_info.txt main.py
 
       # 5. 生成された CapTool.exe を GitHub Releases に自動で投稿する
