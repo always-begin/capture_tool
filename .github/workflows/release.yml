@@ -30,23 +30,26 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      # 4. タグ名からバージョンを抽出し、メタデータに注入してビルドする
-      - name: Build with PyInstaller and Version Info
+      # 4. タグ名からバージョンを抽出し、バージョン情報ファイルを生成する
+      - name: Generate version info
         shell: pwsh
         run: |
           $VERSION = "${{ github.ref }}" -replace 'refs/tags/v', ''
-          $VERSION_COMMA = ($VERSION -replace '\.', ',') + ',0'
-          (Get-Content file_version_info.txt) -replace '1, 0, 0, 0', $VERSION_COMMA | Set-Content file_version_info.txt -Encoding utf8NoBOM
-          (Get-Content file_version_info.txt) -replace '1\.0\.0', $VERSION | Set-Content file_version_info.txt -Encoding utf8NoBOM
+          python scripts/generate_version_info.py $VERSION
+
+      # 5. PyInstallerでexeをビルドする
+      - name: Build with PyInstaller
+        shell: pwsh
+        run: |
           $scripts = python -c "import sysconfig; print(sysconfig.get_path('scripts'))"
           $env:PATH = "$scripts;" + $env:PATH
-          pyinstaller --onefile --noconsole --name "CapTool" --version-file=file_version_info.txt main.py
+          pyinstaller --onefile --noconsole --name "CapTool" --version-file=version_info_generated.txt main.py
 
-      # 5. 生成された CapTool.exe を GitHub Releases に自動で投稿する
+      # 6. 生成された CapTool.exe を GitHub Releases に自動で投稿する
       - name: Create Release and Upload Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/CapTool.exe  # ← ステップ4の名前と完全に一致させました
+          files: dist/CapTool.exe
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
