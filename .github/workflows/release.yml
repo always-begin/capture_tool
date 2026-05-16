@@ -27,6 +27,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pyinstaller
 
       # 4. タグ名からバージョンを抽出し、メタデータに注入してビルドする
       - name: Build with PyInstaller and Version Info
@@ -42,7 +43,7 @@ jobs:
           sed -i "s/1.0.0/$VERSION/g" file_version_info.txt
 
           # アプリ名を「CapTool」に指定してビルドを実行
-          pyinstaller --onefile --noconsole --name "CapTool" --version-file=file_version_info.txt main.py
+          python -m pyinstaller --onefile --noconsole --name "CapTool" --version-file=file_version_info.txt main.py
 
       # 5. 生成された CapTool.exe を GitHub Releases に自動で投稿する
       - name: Create Release and Upload Asset
