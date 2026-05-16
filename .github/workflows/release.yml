@@ -36,8 +36,8 @@ jobs:
         run: |
           $VERSION = "${{ github.ref }}" -replace 'refs/tags/v', ''
           $VERSION_COMMA = ($VERSION -replace '\.', ',') + ',0'
-          (Get-Content file_version_info.txt) -replace '1, 0, 0, 0', $VERSION_COMMA | Set-Content file_version_info.txt
-          (Get-Content file_version_info.txt) -replace '1\.0\.0', $VERSION | Set-Content file_version_info.txt
+          (Get-Content file_version_info.txt) -replace '1, 0, 0, 0', $VERSION_COMMA | Set-Content file_version_info.txt -Encoding utf8NoBOM
+          (Get-Content file_version_info.txt) -replace '1\.0\.0', $VERSION | Set-Content file_version_info.txt -Encoding utf8NoBOM
           $scripts = python -c "import sysconfig; print(sysconfig.get_path('scripts'))"
           $env:PATH = "$scripts;" + $env:PATH
           pyinstaller --onefile --noconsole --name "CapTool" --version-file=file_version_info.txt main.py
